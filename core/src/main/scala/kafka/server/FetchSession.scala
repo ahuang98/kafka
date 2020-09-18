@@ -685,13 +685,13 @@ class FetchSessionCache(private val maxEntries: Int,
     val evictableKey = session.evictableKey
     // }
     // ahu optimize
-    if (session.privileged) {
-      privilegedSessions.remove(evictableKey)
-    } else {
-      unprivilegedSessions.remove(evictableKey)
-    }
-    // unprivilegedSessions.remove(evictableKey)
-    // privilegedSessions.remove(evictableKey)
+    // if (session.privileged) {
+    //   privilegedSessions.remove(evictableKey)
+    // } else {
+    //   unprivilegedSessions.remove(evictableKey)
+    // }
+    unprivilegedSessions.remove(evictableKey)
+    privilegedSessions.remove(evictableKey)
     val removeResult = sessions.remove(session.id)
     if (removeResult.isDefined) {
       numPartitions = numPartitions - session.cachedSize
@@ -717,10 +717,10 @@ class FetchSessionCache(private val maxEntries: Int,
       val newEvictableKey = session.evictableKey
       if (oldEvictableKey != newEvictableKey) {
         if (session.privileged) {
-          privilegedSessions.remove(oldEvictableKey)
+          // privilegedSessions.remove(oldEvictableKey)
           privilegedSessions.put(newEvictableKey, session)
         } else {
-          unprivilegedSessions.remove(oldEvictableKey)
+          // unprivilegedSessions.remove(oldEvictableKey)
           unprivilegedSessions.put(newEvictableKey, session)
         }
 
