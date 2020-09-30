@@ -26,6 +26,7 @@ import org.apache.kafka.common.message.ApiVersionsResponseData.FinalizedFeatureK
 import org.apache.kafka.common.message.ApiVersionsResponseData.FinalizedFeatureKeyCollection;
 import org.apache.kafka.common.message.ApiVersionsResponseData.SupportedFeatureKey;
 import org.apache.kafka.common.message.ApiVersionsResponseData.SupportedFeatureKeyCollection;
+
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.ByteBufferAccessor;
 import org.apache.kafka.common.protocol.Errors;
@@ -167,7 +168,7 @@ public class ApiVersionsResponse extends AbstractResponse {
         final int finalizedFeaturesEpoch
     ) {
         ApiVersionsResponseKeyCollection apiKeys = new ApiVersionsResponseKeyCollection();
-        for (ApiKeys apiKey : ApiKeys.enabledApis()) {
+        for (ApiKeys apiKey : ApiKeys.values()) {
             if (apiKey.minRequiredInterBrokerMagic <= minMagic) {
                 apiKeys.add(new ApiVersionsResponseKey()
                     .setApiKey(apiKey.id)

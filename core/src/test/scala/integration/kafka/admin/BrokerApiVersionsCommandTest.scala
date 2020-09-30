@@ -30,8 +30,6 @@ import org.apache.kafka.common.protocol.ApiKeys
 import org.junit.Assert.{assertEquals, assertFalse, assertNotNull, assertTrue}
 import org.junit.Test
 
-import scala.jdk.CollectionConverters._
-
 class BrokerApiVersionsCommandTest extends KafkaServerTestHarness {
 
   def generateConfigs: Seq[KafkaConfig] = TestUtils.createBrokerConfigs(1, zkConnect).map(KafkaConfig.fromProps)
@@ -46,14 +44,13 @@ class BrokerApiVersionsCommandTest extends KafkaServerTestHarness {
     assertTrue(lineIter.hasNext)
     assertEquals(s"$brokerList (id: 0 rack: null) -> (", lineIter.next())
     val nodeApiVersions = NodeApiVersions.create
-    val enabledApis = ApiKeys.enabledApis.asScala
-    for (apiKey <- enabledApis) {
+    for (apiKey <- ApiKeys.values) {
       val apiVersion = nodeApiVersions.apiVersion(apiKey)
       assertNotNull(apiVersion)
       val versionRangeStr =
         if (apiVersion.minVersion == apiVersion.maxVersion) apiVersion.minVersion.toString
         else s"${apiVersion.minVersion} to ${apiVersion.maxVersion}"
-      val terminator = if (apiKey == enabledApis.last) "" else ","
+      val terminator = if (apiKey == ApiKeys.values.last) "" else ","
       val usableVersion = nodeApiVersions.latestUsableVersion(apiKey)
       val line = s"\t${apiKey.name}(${apiKey.id}): $versionRangeStr [usable: $usableVersion]$terminator"
       assertTrue(lineIter.hasNext)

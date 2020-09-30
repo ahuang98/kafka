@@ -701,10 +701,10 @@ public class KTableImpl<K, S, V> extends AbstractStream<K, V> implements KTable<
         final Set<String> allSourceNodes = ensureCopartitionWith(Collections.singleton((AbstractStream<K, VO>) other));
 
         if (leftOuter) {
-            enableSendingOldValues(true);
+            enableSendingOldValues();
         }
         if (rightOuter) {
-            ((KTableImpl<?, ?, ?>) other).enableSendingOldValues(true);
+            ((KTableImpl<?, ?, ?>) other).enableSendingOldValues();
         }
 
         final KTableKTableAbstractJoin<K, VR, V, VO> joinThis;
@@ -807,7 +807,7 @@ public class KTableImpl<K, S, V> extends AbstractStream<K, V> implements KTable<
 
         builder.addGraphNode(this.streamsGraphNode, groupByMapNode);
 
-        this.enableSendingOldValues(true);
+        this.enableSendingOldValues();
         return new KGroupedTableImpl<>(
             builder,
             selectName,
@@ -832,25 +832,18 @@ public class KTableImpl<K, S, V> extends AbstractStream<K, V> implements KTable<
     }
 
     @SuppressWarnings("unchecked")
-    public boolean enableSendingOldValues(final boolean forceMaterialization) {
+    public void enableSendingOldValues() {
         if (!sendOldValues) {
             if (processorSupplier instanceof KTableSource) {
                 final KTableSource<K, ?> source = (KTableSource<K, V>) processorSupplier;
-                if (!forceMaterialization && !source.materialized()) {
-                    return false;
-                }
                 source.enableSendingOldValues();
             } else if (processorSupplier instanceof KStreamAggProcessorSupplier) {
                 ((KStreamAggProcessorSupplier<?, K, S, V>) processorSupplier).enableSendingOldValues();
             } else {
-                final KTableProcessorSupplier<K, S, V> tableProcessorSupplier = (KTableProcessorSupplier<K, S, V>) processorSupplier;
-                if (!tableProcessorSupplier.enableSendingOldValues(forceMaterialization)) {
-                    return false;
-                }
+                ((KTableProcessorSupplier<K, S, V>) processorSupplier).enableSendingOldValues();
             }
             sendOldValues = true;
         }
-        return true;
     }
 
     boolean sendingOldValueEnabled() {
@@ -974,11 +967,11 @@ public class KTableImpl<K, S, V> extends AbstractStream<K, V> implements KTable<
         //Old values are a useful optimization. The old values from the foreignKeyTable table are compared to the new values,
         //such that identical values do not cause a prefixScan. PrefixScan and propagation can be expensive and should
         //not be done needlessly.
-        ((KTableImpl<?, ?, ?>) foreignKeyTable).enableSendingOldValues(true);
+        ((KTableImpl<?, ?, ?>) foreignKeyTable).enableSendingOldValues();
 
         //Old values must be sent such that the ForeignJoinSubscriptionSendProcessorSupplier can propagate deletions to the correct node.
         //This occurs whenever the extracted foreignKey changes values.
-        enableSendingOldValues(true);
+        enableSendingOldValues();
 
         final NamedInternal renamed = new NamedInternal(joinName);
 

@@ -72,12 +72,11 @@ class KTableTransformValues<K, V, V1> implements KTableProcessorSupplier<K, V, V
     }
 
     @Override
-    public boolean enableSendingOldValues(final boolean forceMaterialization) {
-        if (parent.enableSendingOldValues(forceMaterialization)) {
-            sendOldValues = true;
-        }
-        return sendOldValues;
+    public void enableSendingOldValues() {
+        parent.enableSendingOldValues();
+        sendOldValues = true;
     }
+
 
     private class KTableTransformValuesProcessor extends AbstractProcessor<K, Change<V>> {
         private final ValueTransformerWithKey<? super K, ? super V, ? extends V1> valueTransformer;

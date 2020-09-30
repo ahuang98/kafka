@@ -141,5 +141,8 @@ public class KStreamAggregate<K, V, T> implements KStreamAggProcessorSupplier<K,
         public ValueAndTimestamp<T> get(final K key) {
             return store.get(key);
         }
+
+        @Override
+        public void close() {}
     }
 }

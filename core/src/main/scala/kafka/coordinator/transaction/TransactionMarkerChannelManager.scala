@@ -24,7 +24,6 @@ import kafka.common.{InterBrokerSendThread, RequestAndCompletionHandler}
 import kafka.metrics.KafkaMetricsGroup
 import kafka.server.{KafkaConfig, MetadataCache}
 import kafka.utils.{CoreUtils, Logging}
-import kafka.utils.Implicits._
 import org.apache.kafka.clients._
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.network._
@@ -116,7 +115,7 @@ class TxnMarkerQueue(@volatile var destination: Node) {
   }
 
   def forEachTxnTopicPartition[B](f:(Int, BlockingQueue[TxnIdAndMarkerEntry]) => B): Unit =
-    markersPerTxnTopicPartition.forKeyValue { (partition, queue) =>
+    markersPerTxnTopicPartition.foreach { case (partition, queue) =>
       if (!queue.isEmpty) f(partition, queue)
     }
 

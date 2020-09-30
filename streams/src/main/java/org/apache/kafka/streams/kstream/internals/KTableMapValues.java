@@ -66,11 +66,9 @@ class KTableMapValues<K, V, V1> implements KTableProcessorSupplier<K, V, V1> {
     }
 
     @Override
-    public boolean enableSendingOldValues(final boolean forceMaterialization) {
-        if (parent.enableSendingOldValues(forceMaterialization)) {
-            sendOldValues = true;
-        }
-        return sendOldValues;
+    public void enableSendingOldValues() {
+        parent.enableSendingOldValues();
+        sendOldValues = true;
     }
 
     private V1 computeValue(final K key, final V value) {

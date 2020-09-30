@@ -25,9 +25,10 @@ package org.apache.kafka.streams.processor;
  */
 public abstract class AbstractProcessor<K, V> implements Processor<K, V> {
 
-    protected ProcessorContext context;
+    private ProcessorContext context;
 
-    protected AbstractProcessor() {}
+    protected AbstractProcessor() {
+    }
 
     @Override
     public void init(final ProcessorContext context) {

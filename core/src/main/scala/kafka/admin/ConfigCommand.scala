@@ -550,7 +550,7 @@ object ConfigCommand extends Config {
 
   private def describeClientQuotaAndUserScramCredentialConfigs(adminClient: Admin, entityTypes: List[String], entityNames: List[String]) = {
     val quotaConfigs = getAllClientQuotasConfigs(adminClient, entityTypes, entityNames)
-    quotaConfigs.forKeyValue { (entity, entries) =>
+    quotaConfigs.foreach { case (entity, entries) =>
       val entityEntries = entity.entries.asScala
 
       def entitySubstr(entityType: String): Option[String] =

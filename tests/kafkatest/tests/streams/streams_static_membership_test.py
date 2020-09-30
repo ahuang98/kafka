@@ -18,7 +18,7 @@ from kafkatest.services.kafka import KafkaService
 from kafkatest.services.streams import StaticMemberTestService
 from kafkatest.services.verifiable_producer import VerifiableProducer
 from kafkatest.services.zookeeper import ZookeeperService
-from kafkatest.tests.streams.utils import verify_stopped, stop_processors, verify_running, extract_generation_from_logs, extract_generation_id
+from kafkatest.tests.streams.utils import verify_stopped, stop_processors, verify_running, extract_generation_from_logs
 
 class StreamsStaticMembershipTest(Test):
     """
@@ -83,7 +83,7 @@ class StreamsStaticMembershipTest(Test):
                 "Smaller than minimum expected %d generation messages, actual %d" % (num_bounce_generations, len(generations))
 
             for generation in generations[-num_bounce_generations:]:
-                generation = extract_generation_id(generation)
+                generation = int(generation)
                 if stable_generation == -1:
                     stable_generation = generation
                 assert stable_generation == generation, \

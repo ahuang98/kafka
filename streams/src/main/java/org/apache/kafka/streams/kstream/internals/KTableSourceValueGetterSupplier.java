@@ -48,5 +48,9 @@ public class KTableSourceValueGetterSupplier<K, V> implements KTableValueGetterS
         public ValueAndTimestamp<V> get(final K key) {
             return store.get(key);
         }
+
+        @Override
+        public void close() {
+        }
     }
 }

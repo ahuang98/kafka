@@ -316,13 +316,8 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
         try {
             // if we failed to read to end of log before, we need to make sure the issue was resolved before joining group
             // Joining and immediately leaving for failure to read configs is exceedingly impolite
-            if (!canReadConfigs) {
-                if (readConfigToEnd(workerSyncTimeoutMs)) {
-                    canReadConfigs = true;
-                } else {
-                    return; // Safe to return and tick immediately because readConfigToEnd will do the backoff for us
-                }
-            }
+            if (!canReadConfigs && !readConfigToEnd(workerSyncTimeoutMs))
+                return; // Safe to return and tick immediately because readConfigToEnd will do the backoff for us
 
             log.debug("Ensuring group membership is still active");
             member.ensureActive();
@@ -1110,9 +1105,7 @@ public class DistributedHerder extends AbstractHerder implements Runnable {
             // we timed out. This should only happen if we failed to read configuration for long enough,
             // in which case giving back control to the main loop will prevent hanging around indefinitely after getting kicked out of the group.
             // We also indicate to the main loop that we failed to readConfigs so it will check that the issue was resolved before trying to join the group
-            if (readConfigToEnd(workerSyncTimeoutMs)) {
-                canReadConfigs = true;
-            } else {
+            if (!readConfigToEnd(workerSyncTimeoutMs)) {
                 canReadConfigs = false;
                 needsRejoin = true;
             }

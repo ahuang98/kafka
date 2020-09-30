@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Base64.Encoder;
 import java.util.Set;
@@ -52,6 +53,7 @@ import javax.security.sasl.SaslException;
 
 import org.apache.kafka.clients.NetworkClient;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.config.internals.BrokerSecurityConfigs;
 import org.apache.kafka.common.config.types.Password;
@@ -60,9 +62,6 @@ import org.apache.kafka.common.message.ApiVersionsRequestData;
 import org.apache.kafka.common.message.ApiVersionsResponseData;
 import org.apache.kafka.common.message.ApiVersionsResponseData.ApiVersionsResponseKey;
 import org.apache.kafka.common.message.ApiVersionsResponseData.ApiVersionsResponseKeyCollection;
-import org.apache.kafka.common.message.ListOffsetResponseData;
-import org.apache.kafka.common.message.ListOffsetResponseData.ListOffsetTopicResponse;
-import org.apache.kafka.common.message.ListOffsetResponseData.ListOffsetPartitionResponse;
 import org.apache.kafka.common.message.RequestHeaderData;
 import org.apache.kafka.common.message.SaslAuthenticateRequestData;
 import org.apache.kafka.common.message.SaslHandshakeRequestData;
@@ -1582,17 +1581,8 @@ public class SaslAuthenticatorTest {
 
     @Test
     public void testConvertListOffsetResponseToSaslHandshakeResponse() {
-        ListOffsetResponseData data = new ListOffsetResponseData()
-                .setThrottleTimeMs(0)
-                .setTopics(Collections.singletonList(new ListOffsetTopicResponse()
-                        .setName("topic")
-                        .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                                .setErrorCode(Errors.NONE.code())
-                                .setLeaderEpoch(ListOffsetResponse.UNKNOWN_EPOCH)
-                                .setPartitionIndex(0)
-                                .setOffset(0)
-                                .setTimestamp(0)))));
-        ListOffsetResponse response = new ListOffsetResponse(data);
+        ListOffsetResponse response = new ListOffsetResponse(0, Collections.singletonMap(new TopicPartition("topic", 0),
+            new ListOffsetResponse.PartitionData(Errors.NONE, 0, 0, Optional.empty())));
         ByteBuffer buffer = response.serialize(ApiKeys.LIST_OFFSETS, LIST_OFFSETS.latestVersion(), 0);
         final RequestHeader header0 = new RequestHeader(LIST_OFFSETS, LIST_OFFSETS.latestVersion(), "id", SaslClientAuthenticator.MIN_RESERVED_CORRELATION_ID);
         Assert.assertThrows(SchemaException.class, () -> NetworkClient.parseResponse(buffer.duplicate(), header0));

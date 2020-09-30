@@ -28,7 +28,7 @@ class KTableFilter<K, V> implements KTableProcessorSupplier<K, V, V> {
     private final Predicate<? super K, ? super V> predicate;
     private final boolean filterNot;
     private final String queryableName;
-    private boolean sendOldValues;
+    private boolean sendOldValues = false;
 
     KTableFilter(final KTableImpl<K, ?, V> parent,
                  final Predicate<? super K, ? super V> predicate,
@@ -38,8 +38,6 @@ class KTableFilter<K, V> implements KTableProcessorSupplier<K, V, V> {
         this.predicate = predicate;
         this.filterNot = filterNot;
         this.queryableName = queryableName;
-        // If upstream is already materialized, enable sending old values to avoid sending unnecessary tombstones:
-        this.sendOldValues = parent.enableSendingOldValues(false);
     }
 
     @Override
@@ -48,11 +46,9 @@ class KTableFilter<K, V> implements KTableProcessorSupplier<K, V, V> {
     }
 
     @Override
-    public boolean enableSendingOldValues(final boolean forceMaterialization) {
-        if (parent.enableSendingOldValues(forceMaterialization)) {
-            sendOldValues = true;
-        }
-        return sendOldValues;
+    public void enableSendingOldValues() {
+        parent.enableSendingOldValues();
+        sendOldValues = true;
     }
 
     private V computeValue(final K key, final V value) {
@@ -145,6 +141,7 @@ class KTableFilter<K, V> implements KTableProcessorSupplier<K, V, V> {
             this.parentGetter = parentGetter;
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public void init(final ProcessorContext context) {
             parentGetter.init(context);

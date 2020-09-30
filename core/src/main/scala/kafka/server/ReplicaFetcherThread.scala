@@ -17,7 +17,6 @@
 
 package kafka.server
 
-import java.util.Collections
 import java.util.Optional
 
 import kafka.api._
@@ -25,11 +24,9 @@ import kafka.cluster.BrokerEndPoint
 import kafka.log.{LeaderOffsetIncremented, LogAppendInfo}
 import kafka.server.AbstractFetcherThread.ReplicaFetch
 import kafka.server.AbstractFetcherThread.ResultWithPartitions
-import kafka.utils.Implicits._
 import org.apache.kafka.clients.FetchSessionHandler
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.KafkaStorageException
-import org.apache.kafka.common.message.ListOffsetRequestData.{ListOffsetPartition, ListOffsetTopic}
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.record.{MemoryRecords, Records}
@@ -231,27 +228,22 @@ class ReplicaFetcherThread(name: String,
   }
 
   private def fetchOffsetFromLeader(topicPartition: TopicPartition, currentLeaderEpoch: Int, earliestOrLatest: Long): Long = {
-    val topic = new ListOffsetTopic()
-      .setName(topicPartition.topic)
-      .setPartitions(Collections.singletonList(
-          new ListOffsetPartition()
-            .setPartitionIndex(topicPartition.partition)
-            .setCurrentLeaderEpoch(currentLeaderEpoch)
-            .setTimestamp(earliestOrLatest)))
+    val requestPartitionData = new ListOffsetRequest.PartitionData(earliestOrLatest,
+      Optional.of[Integer](currentLeaderEpoch))
+    val requestPartitions = Map(topicPartition -> requestPartitionData)
     val requestBuilder = ListOffsetRequest.Builder.forReplica(listOffsetRequestVersion, replicaId)
-      .setTargetTimes(Collections.singletonList(topic))
+      .setTargetTimes(requestPartitions.asJava)
 
     val clientResponse = leaderEndpoint.sendRequest(requestBuilder)
     val response = clientResponse.responseBody.asInstanceOf[ListOffsetResponse]
-    val responsePartition = response.topics.asScala.find(_.name == topicPartition.topic).get
-      .partitions.asScala.find(_.partitionIndex == topicPartition.partition).get
 
-     Errors.forCode(responsePartition.errorCode) match {
+    val responsePartitionData = response.responseData.get(topicPartition)
+    responsePartitionData.error match {
       case Errors.NONE =>
         if (brokerConfig.interBrokerProtocolVersion >= KAFKA_0_10_1_IV2)
-          responsePartition.offset
+          responsePartitionData.offset
         else
-          responsePartition.oldStyleOffsets.get(0)
+          responsePartitionData.offsets.get(0)
       case error => throw error.exception
     }
   }
@@ -260,7 +252,7 @@ class ReplicaFetcherThread(name: String,
     val partitionsWithError = mutable.Set[TopicPartition]()
 
     val builder = fetchSessionHandler.newBuilder(partitionMap.size, false)
-    partitionMap.forKeyValue { (topicPartition, fetchState) =>
+    partitionMap.foreach { case (topicPartition, fetchState) =>
       // We will not include a replica in the fetch request if it should be throttled.
       if (fetchState.isReadyForFetch && !shouldFollowerThrottle(quota, fetchState, topicPartition)) {
         try {

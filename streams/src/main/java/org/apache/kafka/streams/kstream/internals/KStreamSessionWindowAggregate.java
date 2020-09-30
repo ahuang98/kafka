@@ -217,6 +217,10 @@ public class KStreamSessionWindowAggregate<K, V, Agg> implements KStreamAggProce
                 store.fetchSession(key.key(), key.window().start(), key.window().end()),
                 key.window().end());
         }
+
+        @Override
+        public void close() {
+        }
     }
 
 }

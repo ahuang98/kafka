@@ -23,7 +23,6 @@ import kafka.api.ApiVersion
 import kafka.log.{CleanerConfig, LogConfig, LogManager}
 import kafka.server.{Defaults, MetadataCache}
 import kafka.server.checkpoints.OffsetCheckpoints
-import kafka.utils.TestUtils.MockAlterIsrManager
 import kafka.utils.{MockTime, TestUtils}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.utils.Utils
@@ -40,7 +39,6 @@ class AbstractPartitionTest {
   var logDir1: File = _
   var logDir2: File = _
   var logManager: LogManager = _
-  var alterIsrManager: MockAlterIsrManager = _
   var logConfig: LogConfig = _
   val stateStore: PartitionStateStore = mock(classOf[PartitionStateStore])
   val delayedOperations: DelayedOperations = mock(classOf[DelayedOperations])
@@ -62,7 +60,6 @@ class AbstractPartitionTest {
       logDirs = Seq(logDir1, logDir2), defaultConfig = logConfig, CleanerConfig(enableCleaner = false), time)
     logManager.startup()
 
-    alterIsrManager = TestUtils.createAlterIsrManager()
     partition = new Partition(topicPartition,
       replicaLagTimeMaxMs = Defaults.ReplicaLagTimeMaxMs,
       interBrokerProtocolVersion = ApiVersion.latestVersion,
@@ -71,8 +68,7 @@ class AbstractPartitionTest {
       stateStore,
       delayedOperations,
       metadataCache,
-      logManager,
-      alterIsrManager)
+      logManager)
 
     when(stateStore.fetchTopicConfig()).thenReturn(createLogProperties(Map.empty))
     when(offsetCheckpoints.fetch(ArgumentMatchers.anyString, ArgumentMatchers.eq(topicPartition)))

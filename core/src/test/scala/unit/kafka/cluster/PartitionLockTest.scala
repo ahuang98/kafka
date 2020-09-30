@@ -252,7 +252,6 @@ class PartitionLockTest extends Logging {
     val delayedOperations: DelayedOperations = mock(classOf[DelayedOperations])
     val metadataCache: MetadataCache = mock(classOf[MetadataCache])
     val offsetCheckpoints: OffsetCheckpoints = mock(classOf[OffsetCheckpoints])
-    val alterIsrManager: AlterIsrManager = mock(classOf[AlterIsrManager])
 
     logManager.startup()
     val partition = new Partition(topicPartition,
@@ -263,8 +262,7 @@ class PartitionLockTest extends Logging {
       stateStore,
       delayedOperations,
       metadataCache,
-      logManager,
-      alterIsrManager) {
+      logManager) {
 
       override def shrinkIsr(newIsr: Set[Int]): Unit = {
         shrinkIsrSemaphore.acquire()
@@ -287,8 +285,6 @@ class PartitionLockTest extends Logging {
       .thenReturn(Some(2))
     when(stateStore.expandIsr(ArgumentMatchers.anyInt, ArgumentMatchers.any[LeaderAndIsr]))
       .thenReturn(Some(2))
-    when(alterIsrManager.enqueue(ArgumentMatchers.any[AlterIsrItem]))
-      .thenReturn(true)
 
     partition.createLogIfNotExists(isNew = false, isFutureReplica = false, offsetCheckpoints)
 

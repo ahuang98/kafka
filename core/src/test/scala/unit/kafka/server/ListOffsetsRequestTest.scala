@@ -19,7 +19,6 @@ package kafka.server
 import java.util.Optional
 
 import kafka.utils.TestUtils
-import org.apache.kafka.common.message.ListOffsetRequestData.{ListOffsetPartition, ListOffsetTopic}
 import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 import org.apache.kafka.common.requests.{ListOffsetRequest, ListOffsetResponse}
 import org.apache.kafka.common.{IsolationLevel, TopicPartition}
@@ -34,12 +33,8 @@ class ListOffsetsRequestTest extends BaseRequestTest {
   def testListOffsetsErrorCodes(): Unit = {
     val topic = "topic"
     val partition = new TopicPartition(topic, 0)
-    val targetTimes = List(new ListOffsetTopic()
-      .setName(topic)
-      .setPartitions(List(new ListOffsetPartition()
-        .setPartitionIndex(partition.partition)
-        .setTimestamp(ListOffsetRequest.EARLIEST_TIMESTAMP)
-        .setCurrentLeaderEpoch(0)).asJava)).asJava
+    val targetTimes = Map(partition -> new ListOffsetRequest.PartitionData(
+      ListOffsetRequest.EARLIEST_TIMESTAMP, Optional.of[Integer](0))).asJava
 
     val consumerRequest = ListOffsetRequest.Builder
       .forConsumer(false, IsolationLevel.READ_UNCOMMITTED)
@@ -87,14 +82,8 @@ class ListOffsetsRequestTest extends BaseRequestTest {
     val firstLeaderId = partitionToLeader(topicPartition.partition)
 
     def assertResponseErrorForEpoch(error: Errors, brokerId: Int, currentLeaderEpoch: Optional[Integer]): Unit = {
-      val partition = new ListOffsetPartition()
-          .setPartitionIndex(topicPartition.partition)
-          .setTimestamp(ListOffsetRequest.EARLIEST_TIMESTAMP)
-      if (currentLeaderEpoch.isPresent)
-          partition.setCurrentLeaderEpoch(currentLeaderEpoch.get)
-      val targetTimes = List(new ListOffsetTopic()
-        .setName(topic)
-        .setPartitions(List(partition).asJava)).asJava
+      val targetTimes = Map(topicPartition -> new ListOffsetRequest.PartitionData(
+        ListOffsetRequest.EARLIEST_TIMESTAMP, currentLeaderEpoch)).asJava
       val request = ListOffsetRequest.Builder
         .forConsumer(false, IsolationLevel.READ_UNCOMMITTED)
         .setTargetTimes(targetTimes)
@@ -133,11 +122,8 @@ class ListOffsetsRequestTest extends BaseRequestTest {
 
     def fetchOffsetAndEpoch(serverId: Int,
                             timestamp: Long): (Long, Int) = {
-      val targetTimes = List(new ListOffsetTopic()
-        .setName(topic)
-        .setPartitions(List(new ListOffsetPartition()
-          .setPartitionIndex(topicPartition.partition)
-          .setTimestamp(timestamp)).asJava)).asJava
+      val targetTimes = Map(topicPartition -> new ListOffsetRequest.PartitionData(
+        timestamp, Optional.empty[Integer]())).asJava
 
       val request = ListOffsetRequest.Builder
         .forConsumer(false, IsolationLevel.READ_UNCOMMITTED)
@@ -145,10 +131,11 @@ class ListOffsetsRequestTest extends BaseRequestTest {
         .build()
 
       val response = sendRequest(serverId, request)
-      val partitionData = response.topics.asScala.find(_.name == topic).get
-        .partitions.asScala.find(_.partitionIndex == topicPartition.partition).get
+      val partitionData = response.responseData.get(topicPartition)
+      val epochOpt = partitionData.leaderEpoch
+      assertTrue(epochOpt.isPresent)
 
-      (partitionData.offset, partitionData.leaderEpoch)
+      (partitionData.offset, epochOpt.get)
     }
 
     assertEquals((0L, 0), fetchOffsetAndEpoch(firstLeaderId, 0L))
@@ -170,11 +157,9 @@ class ListOffsetsRequestTest extends BaseRequestTest {
 
   private def assertResponseError(error: Errors, brokerId: Int, request: ListOffsetRequest): Unit = {
     val response = sendRequest(brokerId, request)
-    assertEquals(request.topics.size, response.topics.size)
-    response.topics.asScala.foreach { topic =>
-      topic.partitions.asScala.foreach { partition =>
-        assertEquals(error.code, partition.errorCode)
-      }
+    assertEquals(request.partitionTimestamps.size, response.responseData.size)
+    response.responseData.asScala.values.foreach { partitionData =>
+      assertEquals(error, partitionData.error)
     }
   }
 

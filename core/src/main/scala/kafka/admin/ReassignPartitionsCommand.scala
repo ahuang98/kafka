@@ -24,7 +24,6 @@ import kafka.common.AdminCommandFailedException
 import kafka.log.LogConfig
 import kafka.server.{ConfigType, DynamicConfig}
 import kafka.utils.{CommandDefaultOptions, CommandLineUtils, CoreUtils, Exit, Json, Logging}
-import kafka.utils.Implicits._
 import kafka.utils.json.JsonValue
 import kafka.zk.{AdminZkClient, KafkaZkClient}
 import org.apache.kafka.clients.admin.AlterConfigOp.OpType
@@ -799,7 +798,7 @@ object ReassignPartitionsCommand extends Logging {
                           : Map[TopicPartition, Seq[Int]] = {
     val groupedByTopic = currentAssignment.groupBy { case (tp, _) => tp.topic }
     val proposedAssignments = mutable.Map[TopicPartition, Seq[Int]]()
-    groupedByTopic.forKeyValue { (topic, assignment) =>
+    groupedByTopic.foreach { case (topic, assignment) =>
       val (_, replicas) = assignment.head
       val assignedReplicas = AdminUtils.
         assignReplicasToBrokers(brokerMetadatas, assignment.size, replicas.size)

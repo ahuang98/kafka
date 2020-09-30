@@ -27,7 +27,6 @@ import kafka.log.LogConfig
 import kafka.metrics.KafkaMetricsGroup
 import kafka.server.KafkaConfig
 import kafka.utils.{Logging, NotNothing, Pool}
-import kafka.utils.Implicits._
 import org.apache.kafka.common.config.types.Password
 import org.apache.kafka.common.config.ConfigResource
 import org.apache.kafka.common.memory.MemoryPool
@@ -64,7 +63,7 @@ object RequestChannel extends Logging {
 
     private val metricsMap = mutable.Map[String, RequestMetrics]()
 
-    (ApiKeys.enabledApis.asScala.toSeq.map(_.name) ++
+    (ApiKeys.values.toSeq.map(_.name) ++
         Seq(RequestMetrics.consumerFetchMetricName, RequestMetrics.followFetchMetricName)).foreach { name =>
       metricsMap.put(name, new RequestMetrics(name))
     }
@@ -395,7 +394,7 @@ class RequestChannel(val queueSize: Int,
     requestQueue.take()
 
   def updateErrorMetrics(apiKey: ApiKeys, errors: collection.Map[Errors, Integer]): Unit = {
-    errors.forKeyValue { (error, count) =>
+    errors.foreach { case (error, count) =>
       metrics(apiKey.name).markErrorMeter(error, count)
     }
   }

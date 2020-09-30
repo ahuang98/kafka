@@ -26,7 +26,6 @@ import org.apache.kafka.streams.kstream.internals.KTableProcessorSupplier;
 import org.apache.kafka.streams.kstream.internals.KTableValueGetter;
 import org.apache.kafka.streams.kstream.internals.KTableValueGetterSupplier;
 import org.apache.kafka.streams.kstream.internals.suppress.TimeDefinitions.TimeDefinition;
-import org.apache.kafka.streams.processor.AbstractProcessor;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.internals.InternalProcessorContext;
@@ -50,7 +49,7 @@ public class KTableSuppressProcessorSupplier<K, V> implements KTableProcessorSup
         this.storeName = storeName;
         this.parentKTable = parentKTable;
         // The suppress buffer requires seeing the old values, to support the prior value view.
-        parentKTable.enableSendingOldValues(true);
+        parentKTable.enableSendingOldValues();
     }
 
     @Override
@@ -90,8 +89,8 @@ public class KTableSuppressProcessorSupplier<K, V> implements KTableProcessorSup
 
                     @Override
                     public void close() {
-                        // the main processor is responsible for the buffer's lifecycle
                         parentGetter.close();
+                        // the main processor is responsible for the buffer's lifecycle
                     }
                 };
             }
@@ -108,11 +107,11 @@ public class KTableSuppressProcessorSupplier<K, V> implements KTableProcessorSup
     }
 
     @Override
-    public boolean enableSendingOldValues(final boolean forceMaterialization) {
-        return parentKTable.enableSendingOldValues(forceMaterialization);
+    public void enableSendingOldValues() {
+        parentKTable.enableSendingOldValues();
     }
 
-    private static final class KTableSuppressProcessor<K, V> extends AbstractProcessor<K, Change<V>> {
+    private static final class KTableSuppressProcessor<K, V> implements Processor<K, Change<V>> {
         private final long maxRecords;
         private final long maxBytes;
         private final long suppressDurationMillis;
@@ -140,7 +139,6 @@ public class KTableSuppressProcessorSupplier<K, V> implements KTableProcessorSup
         @SuppressWarnings("unchecked")
         @Override
         public void init(final ProcessorContext context) {
-            super.init(context);
             internalProcessorContext = (InternalProcessorContext) context;
             suppressionEmitSensor = ProcessorNodeMetrics.suppressionEmitSensor(
                 Thread.currentThread().getName(),
@@ -212,6 +210,10 @@ public class KTableSuppressProcessorSupplier<K, V> implements KTableProcessorSup
 
         private boolean shouldForward(final Change<V> value) {
             return value.newValue != null || !safeToDropTombstones;
+        }
+
+        @Override
+        public void close() {
         }
     }
 }

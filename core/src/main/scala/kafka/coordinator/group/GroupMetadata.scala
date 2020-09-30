@@ -22,7 +22,6 @@ import java.util.concurrent.locks.ReentrantLock
 
 import kafka.common.OffsetAndMetadata
 import kafka.utils.{CoreUtils, Logging, nonthreadsafe}
-import kafka.utils.Implicits._
 import org.apache.kafka.clients.consumer.internals.ConsumerProtocol
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.message.JoinGroupResponseData.JoinGroupResponseMember
@@ -476,7 +475,7 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
               // future versions of the consumer protocol. VO must prefix all new versions.
               val buffer = ByteBuffer.wrap(member.metadata(protocolName.get))
               ConsumerProtocol.deserializeVersion(buffer)
-              ConsumerProtocol.deserializeSubscription(buffer, 0).topics.asScala.toSet
+              ConsumerProtocol.deserializeSubscriptionV0(buffer).topics.asScala.toSet
             }.reduceLeft(_ ++ _)
           )
         } catch {
@@ -617,7 +616,7 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
     val producerOffsets = pendingTransactionalOffsetCommits.getOrElseUpdate(producerId,
       mutable.Map.empty[TopicPartition, CommitRecordMetadataAndOffset])
 
-    offsets.forKeyValue { (topicPartition, offsetAndMetadata) =>
+    offsets.foreach { case (topicPartition, offsetAndMetadata) =>
       producerOffsets.put(topicPartition, CommitRecordMetadataAndOffset(None, offsetAndMetadata))
     }
   }
@@ -661,7 +660,7 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
     val pendingOffsetsOpt = pendingTransactionalOffsetCommits.remove(producerId)
     if (isCommit) {
       pendingOffsetsOpt.foreach { pendingOffsets =>
-        pendingOffsets.forKeyValue { (topicPartition, commitRecordMetadataAndOffset) =>
+        pendingOffsets.foreach { case (topicPartition, commitRecordMetadataAndOffset) =>
           if (commitRecordMetadataAndOffset.appendedBatchOffset.isEmpty)
             throw new IllegalStateException(s"Trying to complete a transactional offset commit for producerId $producerId " +
               s"and groupId $groupId even though the offset commit record itself hasn't been appended to the log.")
@@ -699,7 +698,7 @@ private[group] class GroupMetadata(val groupId: String, initialState: GroupState
   def removeOffsets(topicPartitions: Seq[TopicPartition]): immutable.Map[TopicPartition, OffsetAndMetadata] = {
     topicPartitions.flatMap { topicPartition =>
       pendingOffsetCommits.remove(topicPartition)
-      pendingTransactionalOffsetCommits.forKeyValue { (_, pendingOffsets) =>
+      pendingTransactionalOffsetCommits.foreach { case (_, pendingOffsets) =>
         pendingOffsets.remove(topicPartition)
       }
       val removedOffset = offsets.remove(topicPartition)

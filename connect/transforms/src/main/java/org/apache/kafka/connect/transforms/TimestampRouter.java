@@ -91,7 +91,7 @@ public class TimestampRouter<R extends ConnectRecord<R>> implements Transformati
 
     @Override
     public void close() {
-        timestampFormat.remove();
+        timestampFormat = null;
     }
 
     @Override

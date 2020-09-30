@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutionException
 import joptsimple.OptionSpecBuilder
 import kafka.common.AdminCommandFailedException
 import kafka.utils._
-import kafka.utils.Implicits._
 import kafka.zk.KafkaZkClient
 import org.apache.kafka.clients.admin.{Admin, AdminClientConfig}
 import org.apache.kafka.common.ElectionType
@@ -86,7 +85,7 @@ object PreferredReplicaLeaderElectionCommand extends Logging {
     }
   }
 
-  def parsePreferredReplicaElectionData(jsonString: String): collection.immutable.Set[TopicPartition] = {
+  def parsePreferredReplicaElectionData(jsonString: String): immutable.Set[TopicPartition] = {
     Json.parseFull(jsonString) match {
       case Some(js) =>
         js.asJsonObject.get("partitions") match {
@@ -270,7 +269,7 @@ object PreferredReplicaLeaderElectionCommand extends Logging {
 
       if (!failed.isEmpty) {
         val rootException = new AdminCommandFailedException(s"${failed.size} preferred replica(s) could not be elected")
-        failed.forKeyValue { (topicPartition, exception) =>
+        failed.foreach { case (topicPartition, exception) =>
           println(s"Error completing preferred leader election for partition: $topicPartition: $exception")
           rootException.addSuppressed(exception)
         }

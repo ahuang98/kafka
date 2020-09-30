@@ -49,5 +49,8 @@ public class KTableMaterializedValueGetterSupplier<K, V> implements KTableValueG
         public ValueAndTimestamp<V> get(final K key) {
             return store.get(key);
         }
+
+        @Override
+        public void close() {}
     }
 }

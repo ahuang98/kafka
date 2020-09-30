@@ -142,7 +142,7 @@ class TransactionsBounceTest extends IntegrationTestHarness {
     }
 
     val outputRecords = new mutable.ListBuffer[Int]()
-    recordsByPartition.values.foreach { partitionValues =>
+    recordsByPartition.values.foreach { case (partitionValues) =>
       assertEquals("Out of order messages detected", partitionValues, partitionValues.sorted)
       outputRecords.appendAll(partitionValues)
     }

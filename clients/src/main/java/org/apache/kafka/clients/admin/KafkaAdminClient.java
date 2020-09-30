@@ -127,10 +127,6 @@ import org.apache.kafka.common.message.LeaveGroupRequestData.MemberIdentity;
 import org.apache.kafka.common.message.LeaveGroupResponseData.MemberResponse;
 import org.apache.kafka.common.message.ListGroupsRequestData;
 import org.apache.kafka.common.message.ListGroupsResponseData;
-import org.apache.kafka.common.message.ListOffsetRequestData.ListOffsetPartition;
-import org.apache.kafka.common.message.ListOffsetRequestData.ListOffsetTopic;
-import org.apache.kafka.common.message.ListOffsetResponseData.ListOffsetPartitionResponse;
-import org.apache.kafka.common.message.ListOffsetResponseData.ListOffsetTopicResponse;
 import org.apache.kafka.common.message.ListPartitionReassignmentsRequestData;
 import org.apache.kafka.common.message.MetadataRequestData;
 import org.apache.kafka.common.message.OffsetCommitRequestData;
@@ -214,6 +210,7 @@ import org.apache.kafka.common.requests.ListGroupsRequest;
 import org.apache.kafka.common.requests.ListGroupsResponse;
 import org.apache.kafka.common.requests.ListOffsetRequest;
 import org.apache.kafka.common.requests.ListOffsetResponse;
+import org.apache.kafka.common.requests.ListOffsetResponse.PartitionData;
 import org.apache.kafka.common.requests.ListPartitionReassignmentsRequest;
 import org.apache.kafka.common.requests.ListPartitionReassignmentsResponse;
 import org.apache.kafka.common.requests.MetadataRequest;
@@ -253,6 +250,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -2050,7 +2048,7 @@ public class KafkaAdminClient extends AdminClient {
 
         return new DescribeConfigsResult(new HashMap<>(brokerFutures.entrySet().stream()
                 .flatMap(x -> x.getValue().entrySet().stream())
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))));
+                .collect(Collectors.toMap(Entry::getKey, Entry::getValue))));
     }
 
     private Config describeConfigResult(DescribeConfigsResponseData.DescribeConfigsResult describeConfigsResult) {
@@ -2316,7 +2314,7 @@ public class KafkaAdminClient extends AdminClient {
                     completeAllExceptionally(
                         futures.entrySet().stream()
                             .filter(entry -> entry.getKey().brokerId() == brokerId)
-                            .map(Map.Entry::getValue),
+                            .map(Entry::getValue),
                         throwable);
                 }
             }, now);
@@ -2481,7 +2479,7 @@ public class KafkaAdminClient extends AdminClient {
         final CreatePartitionsOptions options) {
         final Map<String, KafkaFutureImpl<Void>> futures = new HashMap<>(newPartitions.size());
         final CreatePartitionsTopicCollection topics = new CreatePartitionsTopicCollection(newPartitions.size());
-        for (Map.Entry<String, NewPartitions> entry : newPartitions.entrySet()) {
+        for (Entry<String, NewPartitions> entry : newPartitions.entrySet()) {
             final String topic = entry.getKey();
             final NewPartitions newPartition = entry.getValue();
             List<List<Integer>> newAssignments = newPartition.assignments();
@@ -3943,7 +3941,7 @@ public class KafkaAdminClient extends AdminClient {
         MetadataResponse mr = context.response().orElseThrow(() -> new IllegalStateException("No Metadata response"));
         List<Call> calls = new ArrayList<>();
         // grouping topic partitions per leader
-        Map<Node, Map<String, ListOffsetTopic>> leaders = new HashMap<>();
+        Map<Node, Map<TopicPartition, ListOffsetRequest.PartitionData>> leaders = new HashMap<>();
 
         for (Map.Entry<TopicPartition, OffsetSpec> entry: topicPartitionOffsets.entrySet()) {
 
@@ -3959,9 +3957,8 @@ public class KafkaAdminClient extends AdminClient {
             if (!mr.errors().containsKey(tp.topic())) {
                 Node node = mr.cluster().leaderFor(tp);
                 if (node != null) {
-                    Map<String, ListOffsetTopic> leadersOnNode = leaders.computeIfAbsent(node, k -> new HashMap<String, ListOffsetTopic>());
-                    ListOffsetTopic topic = leadersOnNode.computeIfAbsent(tp.topic(), k -> new ListOffsetTopic().setName(tp.topic()));
-                    topic.partitions().add(new ListOffsetPartition().setPartitionIndex(tp.partition()).setTimestamp(offsetQuery));
+                    Map<TopicPartition, ListOffsetRequest.PartitionData> leadersOnNode = leaders.computeIfAbsent(node, k -> new HashMap<>());
+                    leadersOnNode.put(tp, new ListOffsetRequest.PartitionData(offsetQuery, Optional.empty()));
                 } else {
                     future.completeExceptionally(Errors.LEADER_NOT_AVAILABLE.exception());
                 }
@@ -3970,12 +3967,11 @@ public class KafkaAdminClient extends AdminClient {
             }
         }
 
-        for (final Map.Entry<Node, Map<String, ListOffsetTopic>> entry : leaders.entrySet()) {
+        for (final Map.Entry<Node, Map<TopicPartition, ListOffsetRequest.PartitionData>> entry: leaders.entrySet()) {
             final int brokerId = entry.getKey().id();
+            final Map<TopicPartition, ListOffsetRequest.PartitionData> partitionsToQuery = entry.getValue();
 
             calls.add(new Call("listOffsets on broker " + brokerId, context.deadline(), new ConstantNodeIdProvider(brokerId)) {
-
-                final List<ListOffsetTopic> partitionsToQuery = new ArrayList<>(entry.getValue().values());
 
                 @Override
                 ListOffsetRequest.Builder createRequest(int timeoutMs) {
@@ -3989,38 +3985,25 @@ public class KafkaAdminClient extends AdminClient {
                     ListOffsetResponse response = (ListOffsetResponse) abstractResponse;
                     Map<TopicPartition, OffsetSpec> retryTopicPartitionOffsets = new HashMap<>();
 
-                    for (ListOffsetTopicResponse topic : response.topics()) {
-                        for (ListOffsetPartitionResponse partition : topic.partitions()) {
-                            TopicPartition tp = new TopicPartition(topic.name(), partition.partitionIndex());
-                            KafkaFutureImpl<ListOffsetsResultInfo> future = futures.get(tp);
-                            Errors error = Errors.forCode(partition.errorCode());
-                            OffsetSpec offsetRequestSpec = topicPartitionOffsets.get(tp);
-                            if (offsetRequestSpec == null) {
-                                log.warn("Server response mentioned unknown topic partition {}", tp);
-                            } else if (MetadataOperationContext.shouldRefreshMetadata(error)) {
-                                retryTopicPartitionOffsets.put(tp, offsetRequestSpec);
-                            } else if (error == Errors.NONE) {
-                                Optional<Integer> leaderEpoch = (partition.leaderEpoch() == ListOffsetResponse.UNKNOWN_EPOCH)
-                                        ? Optional.empty()
-                                        : Optional.of(partition.leaderEpoch());
-                                future.complete(new ListOffsetsResultInfo(partition.offset(), partition.timestamp(), leaderEpoch));
-                            } else {
-                                future.completeExceptionally(error.exception());
-                            }
+                    for (Entry<TopicPartition, PartitionData> result : response.responseData().entrySet()) {
+                        TopicPartition tp = result.getKey();
+                        PartitionData partitionData = result.getValue();
+
+                        KafkaFutureImpl<ListOffsetsResultInfo> future = futures.get(tp);
+                        Errors error = partitionData.error;
+                        OffsetSpec offsetRequestSpec = topicPartitionOffsets.get(tp);
+                        if (offsetRequestSpec == null) {
+                            future.completeExceptionally(new KafkaException("Unexpected topic partition " + tp + " in broker response!"));
+                        } else if (MetadataOperationContext.shouldRefreshMetadata(error)) {
+                            retryTopicPartitionOffsets.put(tp, offsetRequestSpec);
+                        } else if (error == Errors.NONE) {
+                            future.complete(new ListOffsetsResultInfo(partitionData.offset, partitionData.timestamp, partitionData.leaderEpoch));
+                        } else {
+                            future.completeExceptionally(error.exception());
                         }
                     }
 
-                    if (retryTopicPartitionOffsets.isEmpty()) {
-                        // The server should send back a response for every topic partition. But do a sanity check anyway.
-                        for (ListOffsetTopic topic : partitionsToQuery) {
-                            for (ListOffsetPartition partition : topic.partitions()) {
-                                TopicPartition tp = new TopicPartition(topic.name(), partition.partitionIndex());
-                                ApiException error = new ApiException("The response from broker " + brokerId +
-                                        " did not contain a result for topic partition " + tp);
-                                futures.get(tp).completeExceptionally(error);
-                            }
-                        }
-                    } else {
+                    if (!retryTopicPartitionOffsets.isEmpty()) {
                         Set<String> retryTopics = retryTopicPartitionOffsets.keySet().stream().map(
                             TopicPartition::topic).collect(Collectors.toSet());
                         MetadataOperationContext<ListOffsetsResultInfo, ListOffsetsOptions> retryContext =
@@ -4031,12 +4014,9 @@ public class KafkaAdminClient extends AdminClient {
 
                 @Override
                 void handleFailure(Throwable throwable) {
-                    for (ListOffsetTopic topic : entry.getValue().values()) {
-                        for (ListOffsetPartition partition : topic.partitions()) {
-                            TopicPartition tp = new TopicPartition(topic.name(), partition.partitionIndex());
-                            KafkaFutureImpl<ListOffsetsResultInfo> future = futures.get(tp);
-                            future.completeExceptionally(throwable);
-                        }
+                    for (TopicPartition tp : entry.getValue().keySet()) {
+                        KafkaFutureImpl<ListOffsetsResultInfo> future = futures.get(tp);
+                        future.completeExceptionally(throwable);
                     }
                 }
             });
