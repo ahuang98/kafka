@@ -126,6 +126,7 @@ class TestMigration(ProduceConsumeValidateTest):
 
         self.run_produce_consume_validate(core_test_action=partial(self.do_migration, roll_controller = roll_controller))
         self.kafka.stop()
+        self.zk.stop()
 
     @parametrize(metadata_quorum=isolated_kraft)
     def test_pre_migration_mode_3_4(self, metadata_quorum):
@@ -195,6 +196,7 @@ class TestMigration(ProduceConsumeValidateTest):
                     continue
 
         assert saw_expected_error, "Did not see expected ERROR log in the controller logs"
+        self.zk.stop()
 
     def test_upgrade_after_3_4_migration(self):
         """
@@ -270,6 +272,7 @@ class TestMigration(ProduceConsumeValidateTest):
 
         assert saw_expected_log, "Did not see expected INFO log after upgrading from a 3.4 migration"
         self.kafka.stop()
+        self.zk.stop()
 
     def test_reconcile_kraft_to_zk(self):
         """
