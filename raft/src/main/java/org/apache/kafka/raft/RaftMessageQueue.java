@@ -36,7 +36,7 @@ public interface RaftMessageQueue {
      * @return the event or {@code Optional.empty()} if either the timeout was reached or there was
      *     a call to {@link #wakeup()} before any events became available
      */
-    Optional<QueueEntry> poll(long timeoutMs);
+    Optional<MessageEntry> poll(long timeoutMs);
 
     /**
      * Add a new message to the queue.
@@ -61,17 +61,44 @@ public interface RaftMessageQueue {
     void wakeup();
 
     /**
-     * Represents an entry in the message queue.
+     * An element stored in the queue, a real message or a wakeup signal.
      */
-    interface QueueEntry {
-        /**
-         * @return the message associated with this entry
-         */
-        RaftMessage message();
+    sealed interface QueueEntry permits MessageEntry, WakeupEntry { }
 
-        /**
-         * @return the future associated with this entry
-         */
-        CompletableFuture<RaftMessage> future();
+    /**
+     * A queue entry that carries a message and the future to complete when it is processed.
+     */
+    final class MessageEntry implements QueueEntry {
+        private final CompletableFuture<RaftMessage> future = new CompletableFuture<>();
+        private final RaftMessage message;
+
+        public MessageEntry(RaftMessage message) {
+            this.message = message;
+        }
+
+        public RaftMessage message() {
+            return message;
+        }
+
+        public CompletableFuture<RaftMessage> future() {
+            return future;
+        }
+
+        @Override
+        public String toString() {
+            return String.format(
+                "MessageEntry(message=%s, future.isDone=%s)",
+                message,
+                future.isDone()
+            );
+        }
+    }
+
+    /**
+     * A signal used to unblock {@link #poll(long)}. This is a single shared instance
+     * used for every wakeup that is drained by (and not returned by) {@link #poll(long)}.
+     */
+    enum WakeupEntry implements QueueEntry {
+        INSTANCE
     }
 }
